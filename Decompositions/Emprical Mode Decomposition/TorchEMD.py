@@ -18,7 +18,7 @@ class EmpricalModeDecomposition:
         device (torch.device): Device to perform computations (e.g., 'cpu' or 'cuda').
     """
 
-    def __init__(self, max_imfs: int = 10, max_iter: int = 128, tol: float = 1e-8, device: torch.device = 'cpu'):
+    def __init__(self, max_imfs: int = 10, max_iter: int = 128, tol: float = 1e-5, device: torch.device = 'cpu'):
         """
         Initializes the EmpiricalModeDecomposition class.
 
@@ -56,7 +56,7 @@ class EmpricalModeDecomposition:
         Returns:
             torch.tensor: Extracted IMF from the residual signal.
         """
-        h = residual
+        h = residual.clone()
 
         for i in range(self.max_iter):
             # Find local maxima and minima
@@ -68,16 +68,16 @@ class EmpricalModeDecomposition:
                 break
             
             # Convert tensors to numpy for interpolation
-            h = h.cpu().numpy()
-            maxima = maxima.cpu().numpy()
-            minima = minima.cpu().numpy()
+            h_numpy = h.cpu().numpy().copy()
+            maxima_numpy = maxima.cpu().numpy().copy()
+            minima_numpy = minima.cpu().numpy().copy()
 
             # Compute upper and lower envelopes using cubic spline interpolation
-            upper_env = CubicSpline(maxima, h[maxima])(torch.arange(len(h)))
-            lower_env = CubicSpline(minima, h[minima])(torch.arange(len(h)))
+            upper_env = CubicSpline(maxima_numpy, h_numpy[maxima_numpy])(np.arange(len(h_numpy)))
+            lower_env = CubicSpline(minima_numpy, h_numpy[minima_numpy])(np.arange(len(h_numpy)))
 
             # Convert back to tensors
-            h = torch.from_numpy(h).to(self.device)
+            h = torch.from_numpy(h_numpy).to(self.device)
             upper_env = torch.from_numpy(upper_env).to(self.device)
             lower_env = torch.from_numpy(lower_env).to(self.device)
 
@@ -87,12 +87,12 @@ class EmpricalModeDecomposition:
 
             # Check stopping criterion
             zero_crossings = self.count_zero_crossings(new_h)
-            extrema_count = len(maxima) + len(minima)
+            extrema_count = len(maxima_numpy) + len(minima_numpy)
             
             if abs(zero_crossings - extrema_count) <= 1:
                 return new_h
             
-            h = new_h
+            h = new_h.clone()
 
         return h
     
@@ -106,9 +106,10 @@ class EmpricalModeDecomposition:
         Returns:
             tuple: A list of IMFs and the residual signal.
         """
-        signal = torch.from_numpy(signal).to(self.device)
+        signal = signal.copy()
+        signal_tensor = torch.from_numpy(signal).to(self.device)
         imfs = []
-        residual = signal
+        residual = signal_tensor.clone()
 
         for _ in range(self.max_imfs):
             # Extract one IMF
@@ -118,11 +119,11 @@ class EmpricalModeDecomposition:
             residual -= imf
 
             # Add the IMF to the list
-            imf = imf.cpu().numpy()
-            imfs.append(imf)
+            imf_numpy = imf.cpu().numpy().copy()
+            imfs.append(imf_numpy)
 
             # Check if the residual is effectively zero
             if torch.all(torch.abs(residual) < self.tol):
                 break
 
-        return imfs, residual.cpu().numpy()
+        return imfs, residual.cpu().numpy().copy()

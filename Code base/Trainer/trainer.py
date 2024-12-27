@@ -16,6 +16,7 @@ class ModularTrainer:
                  val_loader: Optional[DataLoader] = None,
                  criterion: Optional[nn.Module] = None,
                  optimizer: Optional[optim.Optimizer] = None,
+                 scheduler: Optional[optim.lr_scheduler._LRScheduler] = None,
                  device: Optional[torch.device] = None,
                  config: Optional[Dict[str, Any]] = None):
         """
@@ -35,10 +36,11 @@ class ModularTrainer:
         self.model = model.to(self.device)
         self.train_loader = train_loader
         self.val_loader = val_loader
-
+ 
         # Loss and optimization
         self.criterion = criterion or nn.CrossEntropyLoss()
         self.optimizer = optimizer or optim.Adam(self.model.parameters())
+        self.scheduler = scheduler
 
         # Configuration
         self.config = config or {}
@@ -81,14 +83,15 @@ class ModularTrainer:
             imfs = batch['IMF'].to(self.device)
             spectrograms = batch['Spectrogram'].to(self.device)
             labels = batch['Label'].to(self.device).unsqueeze(dim=1)
-            img_mask = batch['Image Mask'].to(self.device)
-            audio_mask = batch['Audio Mask'].to(self.device)
+            # img_mask = batch['Image Mask'].to(self.device)
+            # audio_mask = batch['Audio Mask'].to(self.device)
             
             # Zero the parameter gradients
             self.optimizer.zero_grad()
             
             # Forward pass
-            outputs = self.model(image=spectrograms, audio=imfs, img_mask=img_mask, audio_mask=audio_mask)
+            # outputs = self.model(image=spectrograms, audio=imfs, img_mask=img_mask, audio_mask=audio_mask)
+            outputs = self.model(image=spectrograms, audio=imfs)
             
             loss = self.criterion(outputs, labels)
             
@@ -136,10 +139,11 @@ class ModularTrainer:
                 imfs = batch['IMF'].to(self.device)
                 spectrograms = batch['Spectrogram'].to(self.device)
                 labels = batch['Label'].to(self.device).unsqueeze(dim=1)
-                img_mask = batch['Image Mask'].to(self.device)
-                audio_mask = batch['Audio Mask'].to(self.device)
+                # img_mask = batch['Image Mask'].to(self.device)
+                # audio_mask = batch['Audio Mask'].to(self.device)
                 
-                outputs = self.model(image=spectrograms, audio=imfs, img_mask=img_mask, audio_mask=audio_mask)
+                # outputs = self.model(image=spectrograms, audio=imfs, img_mask=img_mask, audio_mask=audio_mask)
+                outputs = self.model(image=spectrograms, audio=imfs)
                 
                 loss = self.criterion(outputs, labels)
                 
@@ -156,6 +160,9 @@ class ModularTrainer:
         
         val_loss = total_loss / len(self.val_loader)
         val_accuracy = 100 * correct / total
+
+        if self.scheduler:
+            self.scheduler.step(val_loss)
         
         if self.verbose:
             print(f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%")

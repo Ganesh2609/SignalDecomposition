@@ -1,4 +1,5 @@
 import sys 
+sys.path.append('E:/Deep learning assets (XXXXXXXX)/Classification trainer')
 sys.path.append('E:/Amrita/Subjects/Sem 5/BMSP paper work/Code base/Trainer')
 
 import torch
@@ -6,8 +7,9 @@ from torch import nn
 import matplotlib.pyplot as plt
 
 from trainer import ModularTrainer
-from dataset import get_data_loaders
-from model import CoattentionModel
+from dataset4 import get_data_loaders
+
+from model2 import CoattentionModel
 
 
 
@@ -21,45 +23,36 @@ def main():
 
 
     model = CoattentionModel()
-    
+
 
     lmdb_path = "E:/Amrita/Subjects/Sem 5/BMSP paper work/Dataset/Final VMD/VMD.lmdb"
     seed = 42
-    train_loader, val_loader = get_data_loaders(lmdb_path=lmdb_path, batch_size=5, num_workers=12, prefetch_factor=2, seed=seed)
+    train_loader, test_loader = get_data_loaders(lmdb_path=lmdb_path, batch_size=5, num_workers=12, prefetch_factor=2, seed=seed)
 
 
-    learning_rate = 2e-5
+    learning_rate = 1e-5
     loss_fn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=4, verbose=False)
 
 
     trainer = ModularTrainer(
-    model=model,
-    train_loader=train_loader,  
-    val_loader=val_loader,
-    criterion=loss_fn,
-    optimizer=optimizer,
-    device=device,
-    config={'epochs': 50,
-            'save_dir' : 'E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Checkpoints vmd_attention_aa_imf',
-            'log_dir' : 'E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Logs',
-            'log_file' : 'vmd_attention_aa_imf.log',
-            'verbose' : True
-        }
+        model=model,
+        train_loader=train_loader,  
+        test_loader=test_loader,
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        log_path = 'E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Logs/coattention_reconstructed_stft_wave2vec.log',
+        num_epochs = 24,
+        checkpoint_path = "E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Checkpoints/coattention reconstructed stft wave2vec",
+        loss_path = 'E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Graphs/coattention_reconstructed_stft_wave2vec.png',
+        verbose=True,
+        device=device
     )
 
-
-    #history = trainer.train(resume_from="E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Checkpoints vmd_coattention_ba_mel_imf/model_epoch_50.pth")
-    history = trainer.train(resume_from=None)
-
-    plt.plot(history['train_loss'], label='Training Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Training Loss Over Epochs')
-    plt.legend()
-
-    plt.savefig('E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Graphs/vmd_attention_aa_imf.png', dpi=300, bbox_inches='tight')
-    plt.close()
+    #trainer.train(resume_from="E:/Amrita/Subjects/Sem 5/BMSP paper work/Train data/Checkpoints/Convxnet stft only/model_epoch_15.pth")
+    trainer.train()
 
 
 

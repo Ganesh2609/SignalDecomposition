@@ -7,6 +7,7 @@ import librosa
 from TorchEMD import EmpricalModeDecomposition
 from save_files import save_modes_and_reconstruct
 from scipy.signal import wiener
+from PyEMD import EMD
 
 
 def process_single_batch(csv_path, audio_dir, start_idx, end_idx, out_dir, device: torch.device = 'cpu'):
@@ -23,6 +24,9 @@ def process_single_batch(csv_path, audio_dir, start_idx, end_idx, out_dir, devic
         tol=1e-8,
         device=device
     )
+
+    # Initialize EMD\
+    emd = EMD(MAX_ITERATION=128, DTYPE=np.float32)
     
     for _, row in tqdm(df_batch.iterrows(), total=len(df_batch)):
         
@@ -34,17 +38,15 @@ def process_single_batch(csv_path, audio_dir, start_idx, end_idx, out_dir, devic
         base_filename = os.path.splitext(os.path.basename(file_path))[0]
         
         try:
-            print(file_path)
-            # Read and process audio file
             data, sr = librosa.load(file_path)
-
+            
             if len(data.shape) == 2:
                 data = data[:, 0]
             data = data / np.max(np.abs(data))
             data = wiener(data)
             
             # Decompose signal
-            imfs, _ = emd.decompose(data)
+            imfs = emd.emd(data, max_imf=9)
             
             # Save the decomposed modes and reconstructed signal
             save_modes_and_reconstruct(imfs, sr, data, base_filename, out_dir)
